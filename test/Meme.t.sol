@@ -73,11 +73,11 @@ contract MemeTokenWillGoToZeroTest is Test {
         vm.assume(farcasterId > 0);
 
         // Prepare the message to be signed
-        bytes32 message = keccak256(
-            abi.encodePacked(address(this), farcasterId)
-        );
         bytes32 ethSignedMessage = keccak256(
-            abi.encodePacked("\x19Ethereum Signed Message:\n32", message)
+            abi.encodePacked(
+                "\x19Ethereum Signed Message:\n32",
+                keccak256(abi.encodePacked(address(this), farcasterId))
+            )
         );
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(
@@ -121,21 +121,18 @@ contract MemeTokenWillGoToZeroTest is Test {
             )
         {
             // Success case assertions
-            uint256 tokensToMint = numberOfHundreds * token.MINT_INCREMENT();
-            uint256 newBalance = token.balanceOf(address(this));
-            uint256 newSupply = token.totalSupply();
 
             // Check if the tokens were correctly minted to the address
             assertEq(
-                newBalance,
-                tokensToMint,
+                token.balanceOf(address(this)),
+                numberOfHundreds * token.MINT_INCREMENT(),
                 "Minted amount does not match expected balance"
             );
 
             // Check if the total supply was updated correctly
             assertEq(
-                newSupply,
-                tokenSupplyBefore + tokensToMint,
+                token.totalSupply(),
+                tokenSupplyBefore + numberOfHundreds * token.MINT_INCREMENT(),
                 "Total supply was not updated correctly"
             );
 
@@ -167,7 +164,6 @@ contract MemeTokenWillGoToZeroTest is Test {
                     "Error reason mismatch for mint limit"
                 );
             } else {
-                // Handle other specific failure reasons based on your contract logic
                 fail("Unexpected error reason");
             }
         }
@@ -201,5 +197,103 @@ contract MemeTokenWillGoToZeroTest is Test {
         }
 
         vm.stopPrank();
+    }
+
+    mapping(address => uint256) expectedBalances;
+
+    function testFuzz_BatchAirdrop(
+        address[] memory recipients,
+        uint256[] memory amounts
+    ) public {
+        uint256 maxAmount = type(uint256).max / 10 ** token.decimals();
+
+        for (uint256 i = 0; i < amounts.length; i++) {
+            vm.assume(amounts[i] > 0 && amounts[i] <= maxAmount);
+        }
+
+        uint256[] memory amountsWithDecimals = new uint256[](amounts.length);
+        for (uint256 i = 0; i < amounts.length; i++) {
+            amountsWithDecimals[i] = amounts[i] * 10 ** token.decimals();
+            if (i >= recipients.length) {
+                continue;
+            }
+            vm.assume(recipients[i] != address(0));
+            expectedBalances[recipients[i]] += amountsWithDecimals[i];
+        }
+
+        vm.startPrank(owner);
+        uint256 tokenSupplyBefore = token.totalSupply();
+
+        try token.batchAirdrop(recipients, amounts) {
+            for (uint256 i = 0; i < recipients.length; i++) {
+                assertEq(
+                    token.balanceOf(recipients[i]),
+                    expectedBalances[recipients[i]],
+                    "Incorrect balance after airdrop"
+                );
+            }
+            assertEq(
+                token.totalSupply(),
+                tokenSupplyBefore + sum(amountsWithDecimals),
+                "Total supply did not update correctly"
+            );
+        } catch Error(string memory reason) {
+            if (recipients.length != amounts.length) {
+                assertEq(reason, "Mismatched array lengths");
+            } else if (
+                token.totalSupply() + sum(amountsWithDecimals) >
+                token.MAX_SUPPLY()
+            ) {
+                assertEq(reason, "Max supply exceeded");
+            }
+        }
+
+        vm.stopPrank();
+    }
+
+    function sum(uint256[] memory arr) internal pure returns (uint256 total) {
+        for (uint256 i = 0; i < arr.length; ++i) {
+            total += arr[i];
+        }
+    }
+
+    function testFuzz_WithdrawToPurple() public {
+        uint256 contractBalance = 1 ether;
+        vm.deal(address(token), contractBalance);
+
+        uint256 treasuryBalanceBefore = token.PURPLE_DAO_TREASURY().balance;
+
+        token.withdrawToPurple();
+
+        // Check that the contract's balance is zero
+        assertEq(
+            address(token).balance,
+            0,
+            "Contract balance should be zero after withdrawal"
+        );
+
+        // Check that the treasury's balance increased by the contract's previous balance
+        assertEq(
+            token.PURPLE_DAO_TREASURY().balance,
+            treasuryBalanceBefore + contractBalance,
+            "Treasury did not receive correct amount"
+        );
+    }
+
+    function testFuzz_SetSignerAddress(address _newSigner) public {
+        vm.assume(
+            _newSigner != address(0) && _newSigner != token.signerAddress()
+        );
+
+        // Only the owner should be able to call this function
+        vm.prank(owner);
+        token.setSignerAddress(_newSigner);
+
+        // Assert that the signer address was updated correctly
+        assertEq(
+            token.signerAddress(),
+            _newSigner,
+            "Signer address was not updated correctly"
+        );
     }
 }
