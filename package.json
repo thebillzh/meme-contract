@@ -1,0 +1,48 @@
+{
+  "name": "token-contract",
+  "version": "1.0.0",
+  "license": "MIT",
+  "main": "index.js",
+  "scripts": {
+    "build": "hardhat compile",
+    "coverage": "env COVERAGE=true FOUNDRY=false hardhat coverage",
+    "deploy": "hardhat run scripts/deploy.ts --network ",
+    "test": "hardhat test",
+    "types": "hardhat typechain",
+    "upgrade": "hardhat run scripts/upgrade.ts --network ",
+    "airdrop": "tsx scripts/airdrop.ts airdrop"
+  },
+  "dependencies": {
+    "commander": "^11.1.0",
+    "dotenv": "^16.3.1",
+    "tsx": "^4.7.0",
+    "viem": "^1.21.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
+    "@nomicfoundation/hardhat-ethers": "^3.0.5",
+    "@nomicfoundation/hardhat-foundry": "^1.1.1",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@nomicfoundation/hardhat-toolbox-viem": "^2.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.3",
+    "@nomicfoundation/hardhat-viem": "^1.0.0",
+    "@openzeppelin/contracts": "^5.0.1",
+    "@openzeppelin/contracts-upgradeable": "^5.0.1",
+    "@openzeppelin/hardhat-upgrades": "^3.0.1",
+    "@typechain/ethers-v6": "^0.5.0",
+    "@typechain/hardhat": "^9.0.0",
+    "@types/chai": "^4.3.11",
+    "@types/chai-as-promised": "^7.1.6",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.10.5",
+    "chai": "^4.3.10",
+    "ethers": "^6.9.1",
+    "hardhat": "^2.19.3",
+    "hardhat-gas-reporter": "^1.0.8",
+    "solidity-coverage": "^0.8.1",
+    "ts-node": "^10.9.2",
+    "typechain": "^8.3.0",
+    "typescript": "^5.3.3"
+  }
+}
