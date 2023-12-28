@@ -3,6 +3,7 @@ import { ethers, upgrades } from "hardhat";
 
 import dotenv from "dotenv";
 import { exit } from "process";
+import { formatEther, formatUnits } from "ethers";
 dotenv.config();
 
 const main = async () => {
@@ -10,7 +11,13 @@ const main = async () => {
   const MemeTokenWillGoToZero = await ethers.getContractFactory(
     "MemeTokenWillGoToZero"
   );
-  console.log(`Start deploying`);
+  const balance = await ethers.provider.getBalance(wallet.address);
+
+  console.log(
+    `Start deploying with wallet ${wallet.address} (balance: ${formatEther(
+      balance
+    )} ETH)`
+  );
 
   const memeToken = await upgrades.deployProxy(
     MemeTokenWillGoToZero,
