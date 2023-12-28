@@ -23,7 +23,7 @@ const config: HardhatUserConfig = {
     hardhat: {
       forking: {
         enabled: true,
-        url: `https://eth-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
+        url: process.env.MAINNET_PROVIDER_URL ?? "",
       },
     },
   },
