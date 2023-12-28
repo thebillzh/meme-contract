@@ -3,6 +3,7 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import "forge-std/Vm.sol";
+import "forge-std/console.sol";
 
 import {MemeTokenWillGoToZero} from "../contracts/MemeTokenWillGoToZero.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
@@ -113,15 +114,31 @@ contract MemeTokenWillGoToZeroTest is Test {
         uint256 tokenSupplyBefore = token.totalSupply();
         uint256 userBalanceBefore = address(this).balance;
 
-        try
+        if (requiredPayment > address(this).balance) {
+            vm.expectRevert(MemeTokenWillGoToZero.InvalidPayment.selector);
             token.mintWithFid{value: requiredPayment}(
                 numberOfHundreds,
                 farcasterId,
                 signature
-            )
-        {
-            // Success case assertions
-
+            );
+        } else if (
+            token.balanceOf(address(this)) +
+                numberOfHundreds *
+                token.MINT_INCREMENT() >
+            token.MAX_MINT_PER_ADDRESS()
+        ) {
+            vm.expectRevert(MemeTokenWillGoToZero.MintLimitExceeded.selector);
+            token.mintWithFid{value: requiredPayment}(
+                numberOfHundreds,
+                farcasterId,
+                signature
+            );
+        } else {
+            token.mintWithFid{value: requiredPayment}(
+                numberOfHundreds,
+                farcasterId,
+                signature
+            );
             // Check if the tokens were correctly minted to the address
             assertEq(
                 token.balanceOf(address(this)),
@@ -142,58 +159,36 @@ contract MemeTokenWillGoToZeroTest is Test {
                 userBalanceBefore - requiredPayment,
                 "Incorrect ETH amount deducted"
             );
-        } catch Error(string memory reason) {
-            // Failure case assertions
-            if (
-                keccak256(abi.encodePacked(reason)) ==
-                keccak256(abi.encodePacked("Insufficient ETH sent"))
-            ) {
-                assertTrue(
-                    requiredPayment > address(this).balance,
-                    "Error reason mismatch for insufficient ETH"
-                );
-            } else if (
-                keccak256(abi.encodePacked(reason)) ==
-                keccak256(abi.encodePacked("Mint limit exceeded"))
-            ) {
-                assertTrue(
-                    token.balanceOf(address(this)) +
-                        numberOfHundreds *
-                        token.MINT_INCREMENT() >
-                        token.MAX_MINT_PER_ADDRESS(),
-                    "Error reason mismatch for mint limit"
-                );
-            } else {
-                fail("Unexpected error reason");
-            }
         }
 
         vm.stopPrank();
     }
 
     function testFuzz_Airdrop(address recipient, uint96 amount) public {
-        // Exclude the zero address
         vm.assume(recipient != address(0));
 
-        vm.startPrank(owner);
         uint256 tokenSupplyBefore = token.totalSupply();
-        uint256 recipientBalanceBefore = token.balanceOf(recipient);
-
+        uint256 maxAllowedAirdrop = token.MAX_SUPPLY() - tokenSupplyBefore;
         uint256 amountWithDecimals = amount * 10 ** token.decimals();
 
-        try token.airdrop(recipient, amountWithDecimals) {
+        vm.startPrank(owner);
+
+        if (amountWithDecimals > maxAllowedAirdrop) {
+            vm.expectRevert(MemeTokenWillGoToZero.MaxSupplyExceeded.selector);
+            token.airdrop(recipient, amount);
+        } else {
+            token.airdrop(recipient, amount);
+
             assertEq(
                 token.totalSupply(),
-                tokenSupplyBefore + amountWithDecimals
+                tokenSupplyBefore + amountWithDecimals,
+                "Total supply did not increase correctly"
             );
             assertEq(
                 token.balanceOf(recipient),
-                recipientBalanceBefore + amountWithDecimals
+                amountWithDecimals,
+                "Recipient did not receive the correct amount"
             );
-        } catch Error(string memory reason) {
-            if (token.totalSupply() + amountWithDecimals > token.MAX_SUPPLY()) {
-                assertEq(reason, "Max supply exceeded");
-            }
         }
 
         vm.stopPrank();
@@ -224,7 +219,20 @@ contract MemeTokenWillGoToZeroTest is Test {
         vm.startPrank(owner);
         uint256 tokenSupplyBefore = token.totalSupply();
 
-        try token.batchAirdrop(recipients, amounts) {
+        if (
+            recipients.length != amounts.length ||
+            recipients.length == 0 ||
+            amounts.length == 0
+        ) {
+            vm.expectRevert(MemeTokenWillGoToZero.InvalidBatchInput.selector);
+            token.batchAirdrop(recipients, amounts);
+        } else if (
+            token.totalSupply() + sum(amountsWithDecimals) > token.MAX_SUPPLY()
+        ) {
+            vm.expectRevert(MemeTokenWillGoToZero.MaxSupplyExceeded.selector);
+            token.batchAirdrop(recipients, amounts);
+        } else {
+            token.batchAirdrop(recipients, amounts);
             for (uint256 i = 0; i < recipients.length; i++) {
                 assertEq(
                     token.balanceOf(recipients[i]),
@@ -237,15 +245,6 @@ contract MemeTokenWillGoToZeroTest is Test {
                 tokenSupplyBefore + sum(amountsWithDecimals),
                 "Total supply did not update correctly"
             );
-        } catch Error(string memory reason) {
-            if (recipients.length != amounts.length) {
-                assertEq(reason, "Mismatched array lengths");
-            } else if (
-                token.totalSupply() + sum(amountsWithDecimals) >
-                token.MAX_SUPPLY()
-            ) {
-                assertEq(reason, "Max supply exceeded");
-            }
         }
 
         vm.stopPrank();

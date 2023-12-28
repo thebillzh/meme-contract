@@ -75,6 +75,9 @@ describe("MemeTokenWillGoToZero", () => {
 
   // Test cases here
   it("should deploy correctly", async () => {
+    const TOKEN_NAME = "FARTS";
+    const TOKEN_SYMBOL = "FARTS";
+
     // Check if proxy contract is deployed
     const proxyAddress = await memeToken.getAddress();
     expect(proxyAddress).to.be.properAddress;
@@ -90,8 +93,8 @@ describe("MemeTokenWillGoToZero", () => {
     // Validate contract functionality through the proxy
     const name = await memeToken.name();
     const symbol = await memeToken.symbol();
-    expect(name).to.equal("TESTSHIT");
-    expect(symbol).to.equal("TESTSHIT");
+    expect(name).to.equal(TOKEN_NAME);
+    expect(symbol).to.equal(TOKEN_SYMBOL);
 
     // Verify correct initialization of state variables
     const maxSupply = await memeToken.MAX_SUPPLY();
@@ -112,14 +115,23 @@ describe("MemeTokenWillGoToZero", () => {
 
   describe("_mintTokens", () => {
     it("should revert if insufficient ETH is sent", async () => {
-      const numberOfHundreds = BigInt(1);
+      const numberOfHundreds = 1n;
       const insufficientPayment =
         numberOfHundreds * PRICE_PER_HUNDRED_TOKENS - 1n;
       await expect(
         memeToken.connect(addr1).mint(numberOfHundreds, {
           value: insufficientPayment,
         })
-      ).to.be.revertedWith("Insufficient ETH sent");
+      ).to.be.revertedWithCustomError(memeToken, "InvalidPayment");
+    });
+    it("should revert if extra ETH is sent", async () => {
+      const numberOfHundreds = 1n;
+      const extraPayment = numberOfHundreds * PRICE_PER_HUNDRED_TOKENS + 1n;
+      await expect(
+        memeToken.connect(addr1).mint(numberOfHundreds, {
+          value: extraPayment,
+        })
+      ).to.be.revertedWithCustomError(memeToken, "InvalidPayment");
     });
 
     it("should revert if mint limit per address is exceeded", async () => {
@@ -133,7 +145,7 @@ describe("MemeTokenWillGoToZero", () => {
         memeToken.connect(addr1).mint(tooManyTokensInHundreds, {
           value: tooManyTokensInHundreds * PRICE_PER_HUNDRED_TOKENS,
         })
-      ).to.be.revertedWith("Mint limit exceeded");
+      ).to.be.revertedWithCustomError(memeToken, "MintLimitExceeded");
     });
 
     it("should revert if max supply is exceeded", async () => {
@@ -160,7 +172,7 @@ describe("MemeTokenWillGoToZero", () => {
         memeToken.connect(addr1).mint(MAX_MINT_HUNDREDS_PER_ADDRESS, {
           value: MAX_MINT_HUNDREDS_PER_ADDRESS * PRICE_PER_HUNDRED_TOKENS,
         })
-      ).to.be.revertedWith("Max supply exceeded");
+      ).to.be.revertedWithCustomError(memeToken, "MaxSupplyExceeded");
     });
   });
 
@@ -180,8 +192,7 @@ describe("MemeTokenWillGoToZero", () => {
         BigInt(100) *
         BigInt(10) ** (await memeToken.decimals());
       tx = await memeToken.connect(addr1).mint(numberOfHundreds, {
-        value:
-          numberOfHundreds * PRICE_PER_HUNDRED_TOKENS + EXTRA_VALUE_TRANSFERED,
+        value: numberOfHundreds * PRICE_PER_HUNDRED_TOKENS,
       });
     });
 
@@ -197,19 +208,19 @@ describe("MemeTokenWillGoToZero", () => {
         .withArgs(await addr1.getAddress(), expectedTokens);
     });
 
-    it("should refund", async () => {
-      const receipt = await tx.provider.getTransactionReceipt(tx.hash);
-      if (!receipt) {
-        throw new Error("Empty transaction receipt");
-      }
-      expect(
-        await ethers.provider.getBalance(await addr1.getAddress())
-      ).to.equal(
-        balanceBeforeMint -
-          numberOfHundreds * PRICE_PER_HUNDRED_TOKENS -
-          receipt.gasUsed * receipt.gasPrice
-      );
-    });
+    // it("should refund", async () => {
+    //   const receipt = await tx.provider.getTransactionReceipt(tx.hash);
+    //   if (!receipt) {
+    //     throw new Error("Empty transaction receipt");
+    //   }
+    //   expect(
+    //     await ethers.provider.getBalance(await addr1.getAddress())
+    //   ).to.equal(
+    //     balanceBeforeMint -
+    //       numberOfHundreds * PRICE_PER_HUNDRED_TOKENS -
+    //       receipt.gasUsed * receipt.gasPrice
+    //   );
+    // });
   });
 
   const mintWithFid = (fid: number) => {
@@ -265,7 +276,7 @@ describe("MemeTokenWillGoToZero", () => {
         memeToken.connect(addr1).mintWithFid(numberOfHundreds, 0, signature, {
           value: requiredPayment,
         })
-      ).to.be.revertedWith("FID must be a positive integer");
+      ).to.be.revertedWithCustomError(memeToken, "InvalidFid");
     });
 
     it("should revert if signature is invalid", async () => {
@@ -284,7 +295,7 @@ describe("MemeTokenWillGoToZero", () => {
           .mintWithFid(numberOfHundreds, FARCASTER_ID, signature, {
             value: requiredPayment,
           })
-      ).to.be.revertedWith("Invalid signature");
+      ).to.be.revertedWithCustomError(memeToken, "InvalidSignature");
     });
   };
 
@@ -363,7 +374,12 @@ describe("MemeTokenWillGoToZero", () => {
             ],
             [amount, amount * BigInt(2)]
           )
-      ).to.be.revertedWith("Mismatched array lengths");
+      ).to.be.revertedWithCustomError(memeToken, "InvalidBatchInput");
+    });
+    it("should revert if array is empty", async () => {
+      await expect(
+        memeToken.connect(owner).batchAirdrop([], [])
+      ).to.be.revertedWithCustomError(memeToken, "InvalidBatchInput");
     });
   });
 
@@ -395,7 +411,7 @@ describe("MemeTokenWillGoToZero", () => {
     it("should revert when trying to set signer address to zero address", async () => {
       await expect(
         memeToken.connect(owner).setSignerAddress(ethers.ZeroAddress)
-      ).to.be.revertedWith("Invalid address");
+      ).to.be.revertedWithCustomError(memeToken, "InvalidAddress");
     });
   });
 
