@@ -1,13 +1,12 @@
 /* eslint-disable no-console */
+import dotenv from "dotenv";
+import { formatEther } from "ethers";
 import { ethers, upgrades } from "hardhat";
 
-import dotenv from "dotenv";
-import { exit } from "process";
-import { formatEther, formatUnits } from "ethers";
 dotenv.config();
 
 const main = async () => {
-  const wallet = new ethers.Wallet(process.env.PRIVATE_KEY ?? "");
+  const [wallet] = await ethers.getSigners();
   const MemeTokenWillGoToZero = await ethers.getContractFactory(
     "MemeTokenWillGoToZero"
   );

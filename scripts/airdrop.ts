@@ -5,6 +5,7 @@ import { isAddress } from "ethers";
 import { existsSync } from "fs";
 import { ethers } from "hardhat";
 import { resolve } from "path";
+
 dotenv.config();
 
 export const APP_VERSION = process.env["npm_package_version"] ?? "0.0.0";
