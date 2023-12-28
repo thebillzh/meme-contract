@@ -1,13 +1,10 @@
 /* eslint-disable no-console */
 import { Command } from "commander";
-import { existsSync } from "fs";
-import { resolve } from "path";
-import { createWalletClient, getContract, http } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
-import { mainnet, sepolia } from "viem/chains";
-import { MemeTokenWillGoToZeroABI, MemeTokenWillGoToZeroAddress } from "./abi";
-
 import dotenv from "dotenv";
+import { isAddress } from "ethers";
+import { existsSync } from "fs";
+import { ethers } from "hardhat";
+import { resolve } from "path";
 dotenv.config();
 
 export const APP_VERSION = process.env["npm_package_version"] ?? "0.0.0";
@@ -21,60 +18,52 @@ app
 app
   .command("airdrop")
   .description("Airdrop token to target addresses")
+  .option("-a --address <address>", "Address to the token contract.")
   .option(
     "-p --path <filepath>",
     "Path to the airdrop address and amount pairs json file."
   )
   .action(async (cliOptions) => {
-    const providerUrl = process.env.PROVIDER_URL;
-    if (!providerUrl) {
-      throw new Error(`Missing provider url`);
+    if (!isAddress(cliOptions.address)) {
+      throw new Error(
+        `Token contract address ${cliOptions.address} is invalid`
+      );
     }
-    const walletClient = createWalletClient({
-      chain: process.env.NETWORK === "1" ? mainnet : sepolia,
-      transport: http(process.env.PROVIDER_URL),
-    });
-
-    const privateKey = process.env.PRIVATE_KEY;
-    if (!privateKey) {
-      throw new Error(`Missing private key`);
-    }
-    const account = privateKeyToAccount(`0x${privateKey}`);
+    const tokenAddress = cliOptions.address;
 
     if (!cliOptions.path.endsWith(".json")) {
       throw new Error(
         `Airdrop address and amount pairs file ${cliOptions.path} must be a .json file`
       );
     }
+    const filePath = resolve(cliOptions.path);
 
+    console.log(`Start airdropping`);
     // eslint-disable-next-line security/detect-non-literal-fs-filename
-    if (!existsSync(resolve(cliOptions.path))) {
+    if (!existsSync(filePath)) {
       throw new Error(
         `Airdrop address and amount pairs file ${cliOptions.path} does not exist`
       );
     }
 
     const targets: { address: `0x${string}`; amount: string }[] = (
-      await import(resolve(cliOptions.path))
+      await import(filePath)
     ).default;
 
-    const contract = getContract({
-      abi: MemeTokenWillGoToZeroABI,
-      address: MemeTokenWillGoToZeroAddress,
-      walletClient,
-    });
-    const hash = await contract.write.batchAirdrop(
-      [targets.map((p) => p.address), targets.map((p) => BigInt(p.amount))],
-      {
-        account,
-      }
+    const contract = await ethers.getContractAt(
+      "MemeTokenWillGoToZero",
+      tokenAddress
+    );
+    const tx = await contract.batchAirdrop(
+      targets.map((p) => p.address),
+      targets.map((p) => BigInt(p.amount))
     );
     const totalAmount = targets.reduce(
       (acc, cur) => acc + BigInt(cur.amount),
       BigInt(0)
     );
     console.log(
-      `Airdropped ${targets.length} addresses and ${totalAmount} tokens, transaction hash: ${hash}`
+      `Airdropped ${targets.length} addresses and ${totalAmount} tokens, transaction hash: ${tx.hash}`
     );
   });
 
