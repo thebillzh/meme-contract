@@ -5,12 +5,16 @@ const main = async () => {
   const MemeTokenWillGoToZeroV2 = await ethers.getContractFactory(
     "MemeTokenWillGoToZeroV2"
   );
-  const memeTokenAddress = "DEPLOYED_CONTRACT_ADDRESS";
+  const memeTokenAddress = "DEPLOYED_PROXY_ADDRESS";
   const memeTokenV2 = await upgrades.upgradeProxy(
     memeTokenAddress,
     MemeTokenWillGoToZeroV2
   );
-  console.log("MemeTokenWillGoToZero upgraded to V2 at:", memeTokenV2.address);
+  await memeTokenV2.waitForDeployment();
+  console.log(
+    "MemeTokenWillGoToZero upgraded to V2 at:",
+    await memeTokenV2.getAddress()
+  );
 };
 
 main().catch((error) => {

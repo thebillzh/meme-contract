@@ -6,10 +6,8 @@
   "scripts": {
     "build": "hardhat compile",
     "coverage": "env COVERAGE=true FOUNDRY=false hardhat coverage",
-    "deploy": "hardhat run scripts/deploy.ts --network ",
     "test": "hardhat test",
     "types": "hardhat typechain",
-    "upgrade": "hardhat run scripts/upgrade.ts --network ",
     "airdrop": "tsx scripts/airdrop.ts airdrop"
   },
   "dependencies": {

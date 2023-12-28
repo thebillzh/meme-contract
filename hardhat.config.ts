@@ -12,6 +12,10 @@ dotenv.config();
 const config: HardhatUserConfig = {
   solidity: "0.8.23",
   networks: {
+    sepolia: {
+      url: process.env.PROVIDER_URL,
+      accounts: [process.env.PRIVATE_KEY ?? ""],
+    },
     hardhat: {
       forking: {
         enabled: true,
